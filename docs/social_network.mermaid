@@ -1,0 +1,96 @@
+erDiagram
+  %% User Service
+  USERS {
+    uuid user_id PK
+    string first_name
+    string last_name
+    string email
+    string password
+    string role
+    datetime creation_time
+  }
+
+  SUBSCRIPTIONS {
+    uuid sub_id PK
+    uuid follower_id FK
+    uuid followee_id FK
+    bool is_mutual
+    datetime sub_time
+  }
+
+  PROFILES {
+    uuid profile_id PK
+    uuid user_id FK
+    string avatar
+    string description
+    datetime date_of_birth
+  }
+  
+  USERS ||--o{ SUBSCRIPTIONS : ""
+  USERS ||--|| PROFILES : ""
+
+  %% Statistic Service
+  EVENTS {
+    uuid event_id PK
+    uuid user_id FK
+    uuid post_id FK
+    string event_type
+    datetime event_time
+  }
+
+  USER_STATISTICS {
+    uuid user_id PK
+    datetime update_time
+    int likes
+    int views
+    int comments
+  }
+
+  POST_STATISTICS {
+    uuid post_id PK
+    datetime update_time
+    int likes
+    int views
+    int comments
+  }
+
+  EVENTS }o--|| USER_STATISTICS : ""
+  EVENTS }o--|| POST_STATISTICS : ""
+  
+  %% Post Service
+  POSTS {
+    uuid post_id PK
+    uuid user_id FK
+    string title
+    text content
+    string status
+    datetime update_time
+  }
+
+  COMMENTS {
+    uuid comment_id PK
+    uuid post_id FK
+    uuid user_id FK
+    text content
+    string status
+    datetime update_time
+  }
+
+  TAGS {
+    uuid tag_id PK
+    uuid post_id FK
+    string tag_name
+    int tag_count
+    float tag_weight
+  }
+
+  POSTS ||--o{ COMMENTS : ""
+  POSTS ||--o{ TAGS : ""
+
+  %% Between-services
+  USERS ||--|| USER_STATISTICS : "user_id"
+  USERS ||--o{ POSTS : "user_id"
+  USERS ||--o{ COMMENTS : "user_id"
+
+  
+  POSTS ||--|| POST_STATISTICS : "post_id"
