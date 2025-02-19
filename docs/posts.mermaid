@@ -1,30 +1,29 @@
 erDiagram
-POSTS {
+  POSTS {
     uuid post_id PK
     uuid user_id FK
     string title
     text content
     string status
     datetime update_time
-}
+  }
 
-COMMENTS {
+  COMMENTS {
     uuid comment_id PK
     uuid post_id FK
     uuid user_id FK
     text content
     string status
     datetime update_time
-}
+  }
 
-TAGS {
+  TAGS {
     uuid tag_id PK
     uuid post_id FK
     string tag_name
     int tag_count
     float tag_weight 
-}
+  }
 
-
-POSTS ||--o{ COMMENTS : ""
-POSTS ||--o{ TAGS : ""
+  POSTS ||--o{ COMMENTS : ""
+  POSTS ||--o{ TAGS : ""
