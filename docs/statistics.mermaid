@@ -1,0 +1,27 @@
+erDiagram
+EVENTS {
+    uuid event_id PK
+    uuid user_id FK
+    uuid post_id FK
+    string event_type
+    datetime event_time
+}
+
+USER_STATISTICS {
+    uuid user_id PK
+    datetime update_time
+    int likes
+    int views
+    int comments
+}
+
+POST_STATISTICS {
+    uuid post_id PK
+    datetime update_time
+    int likes
+    int views
+    int comments
+}
+
+EVENTS }o--|| USER_STATISTICS : ""
+EVENTS }o--|| POST_STATISTICS : ""

@@ -1,0 +1,88 @@
+specification {
+    element person {
+        style {
+            shape person
+            color amber
+        }
+    }
+    element softwareSystem
+    element container
+}
+
+model {
+  user = person "Пользователь" "Интерфейс, который использует пользователь"
+
+  socialNetwork = softwareSystem "Social Network" {
+    apiGateway = container "API Gateway" {
+      description "Отвечает за маршрутизацию запросов и управление доступом"
+      technology "Python, FastAPI"
+    }
+
+    userService = container "User Service" {
+      description "Отвечает за управление пользователями (регистрацию/аутентификацию, хранение информации)"
+      technology "Python, FastAPI"
+    }
+
+    statisticService = container "Statistic Service" {
+      description "Отвечает за сбор и анализ статистики (лайков, просмотров, комментариев)"
+      technology "Python, FastAPI"
+    }
+
+    postService = container "Post Service" {
+      description "Отвечает за управление постами и комментариями"
+      technology "Python, FastAPI"
+    }
+
+    postgresUserDb = container "PostgreSQL" {
+      description "Хранение данных пользователей"
+      technology "User Service Database"
+      style {
+        shape cylinder
+      }
+    }
+
+    clickhouseDb = container "ClickHouse" {
+      description "Хранение статистики"
+      technology "Statistic Service Database"
+      style {
+        shape cylinder
+      }
+    }
+
+    postgresPostDb = container "PostgreSQL" {
+      description "Хранение данных о постах и комментариях"
+      technology "Post Service Database"
+      style {
+        shape cylinder
+      }
+    }
+
+    kafka = container "Kafka" {
+      description "Обмен событиями между сервисами"
+      technology "Statistic Message Broker"
+      style {
+        shape queue
+      }
+    }
+  }
+
+user -> socialNetwork.apiGateway "Использует" "HTTPS"
+
+socialNetwork.apiGateway -> socialNetwork.postService "Создание постов и комментариев" "JSON/HTTPS"
+socialNetwork.apiGateway -> socialNetwork.statisticService "Полученеи статистики" "JSON/HTTPS"
+socialNetwork.apiGateway -> socialNetwork.userService "Запрос на аутентификацию/регистрацию" "JSON/HTTPS"
+
+socialNetwork.userService -> socialNetwork.postgresUserDb "Чтение/запись данных пользователей" "SQL"
+socialNetwork.postService -> socialNetwork.postgresPostDb "Чтение/запись постов и комментариев" "SQL"
+socialNetwork.statisticService -> socialNetwork.clickhouseDb "Чтение/запись статистики" "SQL"
+
+socialNetwork.apiGateway -> socialNetwork.kafka "Публикация событий (лайки и просмотры)"
+socialNetwork.postService -> socialNetwork.kafka "Публикация событий (комментарии)"
+socialNetwork.statisticService -> socialNetwork.kafka "Подписка на события"
+}
+
+views {
+   view index {
+        include *
+    }
+}
