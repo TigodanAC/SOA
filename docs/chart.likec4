@@ -69,8 +69,8 @@ model {
 user -> socialNetwork.apiGateway "Использует" "HTTPS"
 
 socialNetwork.apiGateway -> socialNetwork.postService "Создание постов и комментариев" "JSON/HTTPS"
-socialNetwork.apiGateway -> socialNetwork.statisticService "Полученеи статистики" "JSON/HTTPS"
-socialNetwork.apiGateway -> socialNetwork.userService "Запрос на аутентификацию/регистрацию" "JSON/HTTPS"
+socialNetwork.apiGateway -> socialNetwork.statisticService "Получение статистики" "JSON/HTTPS"
+socialNetwork.apiGateway -> socialNetwork.userService "Выполнение аутентификации/регистрации" "JSON/HTTPS"
 
 socialNetwork.userService -> socialNetwork.postgresUserDb "Чтение/запись данных пользователей" "SQL"
 socialNetwork.postService -> socialNetwork.postgresPostDb "Чтение/запись постов и комментариев" "SQL"
