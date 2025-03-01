@@ -3,6 +3,7 @@ import requests
 
 app = Flask(__name__)
 USER_SERVICE_URL = "http://user_service:5000"
+POST_SERVICE_URL = "http://post_service:50051"
 
 
 @app.route('/register', methods=['POST'])

@@ -34,17 +34,33 @@ services:
     networks:
       - my_network
 
+  post_service:
+    build: ./posts_serv
+    ports:
+      - "50051:50051"
+    volumes:
+      - ./posts_serv:/app
+    depends_on:
+      - db
+    environment:
+      - FLASK_ENV=development
+      - TZ=Europe/Moscow
+      - PYTHONPATH=/app:/app/proto
+    networks:
+      - my_network
+
   db:
     image: postgres:13
     environment:
       POSTGRES_USER: user
       POSTGRES_PASSWORD: password
-      POSTGRES_DB: user_db
+      POSTGRES_MULTIPLE_DATABASES: user_db,post_db
       TZ: Europe/Moscow
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./init.sh:/docker-entrypoint-initdb.d/init.sh
     networks:
       - my_network
 
