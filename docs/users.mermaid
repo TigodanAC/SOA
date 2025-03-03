@@ -1,0 +1,29 @@
+erDiagram
+  USERS {
+    uuid user_id PK
+    string first_name
+    string last_name
+    string email
+    string password
+    string role
+    datetime createion_time
+  }
+
+  SUBSCRIPTIONS {
+    uuid sub_id PK
+    uuid follower_id FK
+    uuid followee_id FK
+    bool is_mutual
+    datetime sub_time
+  }
+
+  PROFILES {
+    uuid profile_id PK
+    uuid user_id FK
+    string avatar
+    string description
+    datetime date_of_birth
+  }
+
+  USERS ||--o{ SUBSCRIPTIONS : ""
+  USERS ||--|| PROFILES : ""
