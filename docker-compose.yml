@@ -54,7 +54,7 @@ services:
     volumes:
       - ./api-gateway:/app
       - ./users_serv:/app/users_serv
-    command: ["./wait-for-it.sh", "users_serv:5000", "--", "pytest", "--cov=api_gateway", "tests/"]
+    command: ["./wait-for-it.sh", "users_serv:5000", "--", "pytest", "tests/"]
     depends_on:
       - api_gateway
     environment:
