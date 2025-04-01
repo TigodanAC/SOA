@@ -41,7 +41,7 @@ def test_login_api(client):
         "password": "password@123"
     })
     token = login_response.json["token"]
-    assert client.get('/profile', headers={"authorization": token}).json['email'] == "john@doe.com"
+    assert client.get('/profile', headers={"Authorization": token}).json['email'] == "john@doe.com"
 
     login_response = client.post('/login', json={
         "login": "new_john_doe",
@@ -58,7 +58,7 @@ def test_profile_api(client):
     })
     token = login_response.json["token"]
 
-    update_response = client.put('/profile', headers={"authorization": token}, json={
+    update_response = client.put('/profile', headers={"Authorization": token}, json={
         "first_name": "John",
         "second_name": "Doe",
         "profile": {
@@ -68,15 +68,15 @@ def test_profile_api(client):
     })
     assert update_response.status_code == 200
     assert update_response.json == {"message": "Profile updated successfully"}
-    assert client.get('/profile', headers={"authorization": token}).json['first_name'] == "John"
+    assert client.get('/profile', headers={"Authorization": token}).json['first_name'] == "John"
 
-    update_response = client.put('/profile', headers={"authorization": token}, json={
+    update_response = client.put('/profile', headers={"Authorization": token}, json={
         "login": "new_john_doe",
         "password": "password@1234"
     })
     assert update_response.status_code == 400
     assert update_response.json == {"message": "Updating login or password is not allowed"}
-    assert client.get('/profile', headers={"authorization": token}).json['login'] == "john_doe"
+    assert client.get('/profile', headers={"Authorization": token}).json['login'] == "john_doe"
 
 @pytest.fixture(scope="session", autouse=True)
 def cleanup_after_tests():

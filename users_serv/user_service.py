@@ -94,7 +94,7 @@ def login():
 
 @app.route('/profile', methods=['GET'])
 def get_profile():
-    token = request.headers.get('authorization')
+    token = request.headers.get('Authorization')
     if not token:
         return jsonify({"message": "Token is missing"}), 401
 
@@ -122,7 +122,7 @@ def get_profile():
 
 @app.route('/profile', methods=['PUT'])
 def update_profile():
-    token = request.headers.get('authorization')
+    token = request.headers.get('Authorization')
     if not token:
         return jsonify({"message": "Token is missing"}), 401
 

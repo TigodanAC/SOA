@@ -5,7 +5,7 @@ info:
   description: API for user authentication and registration, and also for profile management.
 
 servers:
-  - url: http://localhost:5000
+  - url: http://localhost:8080
     description: API-Gateway
 
 components:
@@ -13,41 +13,38 @@ components:
     ApiKeyAuth:
       type: apiKey
       in: header
-      name: authorization
+      name: Authorization
 
   schemas:
     User:
       type: object
       properties:
-        user_id:
-          type: string
         login:
           type: string
         first_name:
           type: string
+          nullable: true
         last_name:
           type: string
+          nullable: true
         email:
           type: string
           format: email
         role:
           type: string
-        created_at:
-          type: string
-          format: date
-        updated_at:
-          type: string
-          format: date
         profile:
           type: object
           properties:
             avatar:
               type: string
+              nullable: true
             description:
               type: string
+              nullable: true
             date_of_birth:
               type: string
               format: date
+              nullable: true
 
     UserProfile:
       type: object

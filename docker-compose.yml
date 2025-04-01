@@ -16,7 +16,6 @@ services:
     environment:
       - TZ=Europe/Moscow
       - PYTHONPATH=/app
-    command: ["/wait-for-it.sh", "user_service:5000", "--", "python", "api_gateway.py"]
     networks:
       - my_network
 
