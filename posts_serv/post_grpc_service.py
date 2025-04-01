@@ -1,7 +1,7 @@
 import grpc
 from proto import post_pb2
 from proto import post_pb2_grpc
-from db import PostDB
+from post_db import PostDB
 
 class PostServiceServicer(post_pb2_grpc.PostServiceServicer):
     def __init__(self, db: PostDB):

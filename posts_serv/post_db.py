@@ -4,7 +4,7 @@ from sqlalchemy import create_engine, and_, or_, func
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.exc import SQLAlchemyError, OperationalError
 from proto import post_pb2
-from .models import Base, Post
+from models import Base, Post
 
 
 class PostDB:
@@ -15,6 +15,7 @@ class PostDB:
             try:
                 self.engine = create_engine(db_url)
                 self.Session = sessionmaker(bind=self.engine)
+                Base.metadata.drop_all(self.engine)
                 Base.metadata.create_all(self.engine)
                 break
             except OperationalError:
