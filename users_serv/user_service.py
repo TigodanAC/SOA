@@ -165,6 +165,18 @@ def update_profile():
     else:
         return jsonify({"message": "User not found"}), 404
 
+@app.route('/id', methods=['GET'])
+def get_user_info():
+    token = request.headers.get('Authorization')
+    if not token:
+        return jsonify({"message": "Token is missing."}), 401
+
+    payload = decode_jwt(token)
+    if not payload:
+        return jsonify({"message": "Invalid or expired token."}), 401
+
+    return jsonify({"user_id": payload['user_id']}), 200
+
 
 if __name__ == '__main__':
     db.init_app(app)

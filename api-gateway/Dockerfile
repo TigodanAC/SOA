@@ -1,10 +1,11 @@
 FROM python:3.9-slim
 WORKDIR /app
-ENV PYTHONUNBUFFERED=1
-COPY wait-for-it.sh /wait-for-it.sh
+COPY proto/ ./proto/
+COPY api-gateway/requirements.txt .
+COPY api-gateway/wait-for-it.sh /wait-for-it.sh
 RUN chmod +x /wait-for-it.sh
-COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-COPY api_gateway.py .
+ENV PYTHONPATH=/app
+COPY api-gateway/ .
 EXPOSE 8080
 CMD ["python", "api_gateway.py"]

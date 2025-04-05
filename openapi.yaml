@@ -57,8 +57,57 @@ components:
           type: string
           format: date
 
+    Post:
+      type: object
+      properties:
+        post_id:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        creator_id:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        is_private:
+          type: boolean
+        tags:
+          type: array
+          items:
+            type: string
+
+    PostList:
+      type: object
+      properties:
+        posts:
+          type: array
+          items:
+            $ref: '#/components/schemas/Post'
+        meta:
+          type: object
+          properties:
+            total:
+              type: integer
+            per_page:
+              type: integer
+            current_page:
+              type: integer
+            last_page:
+              type: integer
+            from_:
+              type: integer
+            to_:
+              type: integer
+
     ErrorResponse:
       type: object
+      required:
+        - message
       properties:
         message:
           type: string
@@ -68,6 +117,7 @@ paths:
   /register:
     post:
       summary: Register user
+      tags: [ Authentication ]
       requestBody:
         required: true
         content:
@@ -86,6 +136,19 @@ paths:
                 - login
                 - email
                 - password
+            examples:
+              first_user:
+                summary: "Первый пользователь"
+                value:
+                  login: "crtistiano"
+                  email: "rondaldo@example.com"
+                  password: "CR@Best1985"
+              second_user:
+                summary: "Второй пользователь"
+                value:
+                  login: "lionel"
+                  email: "messi@example.com"
+                  password: "messi@forever87"
       responses:
         '201':
           description: Successful registration
@@ -101,11 +164,15 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                type: object
+                properties:
+                  message:
+                    type: string
 
   /login:
     post:
       summary: Login as user
+      tags: [ Authentication ]
       requestBody:
         required: true
         content:
@@ -120,6 +187,17 @@ paths:
               required:
                 - login
                 - password
+            examples:
+              first_user:
+                summary: "Первый пользователь"
+                value:
+                  login: "crtistiano"
+                  password: "CR@Best1985"
+              second_user:
+                summary: "Второй пользователь"
+                value:
+                  login: "lionel"
+                  password: "messi@forever87"
       responses:
         '200':
           description: Successful authorization
@@ -140,6 +218,7 @@ paths:
   /profile:
     get:
       summary: Get user profile
+      tags: [ Users ]
       security:
         - ApiKeyAuth: [ ]
       responses:
@@ -164,6 +243,7 @@ paths:
 
     put:
       summary: Update user profile
+      tags: [ Users ]
       security:
         - ApiKeyAuth: [ ]
       requestBody:
@@ -187,6 +267,25 @@ paths:
                     date_of_birth:
                       type: string
                       format: date
+            examples:
+              first_user:
+                summary: "Первый пользователь"
+                value:
+                  first_name: "Cristiano"
+                  last_name: "rondaldo"
+                  profile:
+                    avatar: "https://example.com/cr7.png"
+                    description: "Best footballer over all time"
+                    date_of_birth: "1985-02-05"
+              second_user:
+                summary: "Второй пользователь"
+                value:
+                  first_name: "lionel"
+                  last_name: "Messi"
+                  profile:
+                    avatar: "https://example.com/barca10.png"
+                    description: "Argentina one love"
+                    date_of_birth: "1987-06-24"
       responses:
         '200':
           description: Profile updated successfully
@@ -205,6 +304,216 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '404':
           description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /posts:
+    post:
+      summary: Create new post
+      tags: [ Posts ]
+      security:
+        - ApiKeyAuth: [ ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                description:
+                  type: string
+                is_private:
+                  type: boolean
+                tags:
+                  type: array
+                  items:
+                    type: string
+              required:
+                - title
+            examples:
+              public_post:
+                summary: "Публичный пост"
+                value:
+                  title: "Что-то о громком"
+                  description: "Это пример публичного поста"
+                  is_private: false
+                  tags: [ "blog", "first" ]
+              private_post:
+                summary: "Приватный пост"
+                value:
+                  title: "Личные заметки"
+                  description: "Только для меня"
+                  is_private: true
+                  tags: [ "personal" ]
+      responses:
+        '201':
+          description: Post created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  post_id:
+                    type: string
+                  created_at:
+                    type: string
+                    format: date-time
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    get:
+      summary: List posts
+      tags: [ Posts ]
+      security:
+        - ApiKeyAuth: [ ]
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+          example: 1
+          description: "Номер страницы"
+          required: false
+        - name: per_page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+          example: 10
+          description: "Количество постов на странице"
+          required: false
+      responses:
+        '200':
+          description: Posts list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PostList'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /posts/{post_id}:
+    get:
+      summary: Get post details
+      tags: [ Posts ]
+      security:
+        - ApiKeyAuth: [ ]
+      parameters:
+        - name: post_id
+          in: path
+          required: true
+          schema:
+            type: string
+          example: '1'
+      responses:
+        '200':
+          description: Post details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Post'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    put:
+      summary: Update post
+      tags: [ Posts ]
+      security:
+        - ApiKeyAuth: [ ]
+      parameters:
+        - name: post_id
+          in: path
+          required: true
+          schema:
+            type: string
+          example: '1'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                description:
+                  type: string
+                is_private:
+                  type: boolean
+                tags:
+                  type: array
+                  items:
+                    type: string
+            examples:
+              edited_post:
+                summary: "Изменённый пост"
+                value:
+                  title: "Что-то о тихом"
+                  description: "Тут могла быть ваша реклама"
+                  is_private: false
+                  tags: [ "blog", "edited" ]
+      responses:
+        '200':
+          description: Post updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  updated_at:
+                    type: string
+                    format: date-time
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    delete:
+      summary: Delete post
+      tags: [ Posts ]
+      security:
+        - ApiKeyAuth: [ ]
+      parameters:
+        - name: post_id
+          in: path
+          required: true
+          schema:
+            type: string
+          example: '1'
+      responses:
+        '200':
+          description: Post deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+        '400':
+          description: Bad request
           content:
             application/json:
               schema:
