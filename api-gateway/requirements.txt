@@ -2,6 +2,15 @@ flask==2.3.2
 werkzeug==2.3.7
 Flask-SQLAlchemy==3.0.5
 psycopg2-binary==2.9.6
-PyJWT==2.8.0
+python-dotenv==0.19.2
+pydantic==2.7.1
 requests==2.31.0
+PyJWT==2.8.0
+protobuf==3.19.3
+grpcio==1.42.0
+grpcio-tools==1.42.0
+email_validator
 pytest
+pytest-cov
+pytest-dependency
+coverage

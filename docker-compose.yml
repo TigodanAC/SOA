@@ -1,4 +1,4 @@
-version: '3.8'
+version: '3.9'
 
 networks:
   my_network:
@@ -6,16 +6,19 @@ networks:
 
 services:
   api_gateway:
-    build: ./api-gateway
+    build:
+      context: .
+      dockerfile: api-gateway/Dockerfile
     ports:
       - "8080:8080"
     volumes:
       - ./users_serv:/app/users_serv
     depends_on:
       - user_service
+      - post_service
     environment:
       - TZ=Europe/Moscow
-      - PYTHONPATH=/app
+      - PYTHONPATH=/app:/app/proto
     networks:
       - my_network
 
@@ -34,36 +37,59 @@ services:
     networks:
       - my_network
 
+  post_service:
+    build:
+      context: .
+      dockerfile: posts_serv/Dockerfile
+    ports:
+      - "50051:50051"
+    depends_on:
+      - db
+    environment:
+      - FLASK_ENV=development
+      - TZ=Europe/Moscow
+      - PYTHONPATH=/app:/app/proto
+    networks:
+      - my_network
+
   db:
     image: postgres:13
     environment:
       POSTGRES_USER: user
       POSTGRES_PASSWORD: password
-      POSTGRES_DB: user_db
+      POSTGRES_MULTIPLE_DATABASES: user_db,post_db
       TZ: Europe/Moscow
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./init.sh:/docker-entrypoint-initdb.d/init.sh
     networks:
       - my_network
 
   tests_api_gateway:
-    build: ./api-gateway
+    build:
+      context: .
+      dockerfile: api-gateway/Dockerfile
     volumes:
-      - ./api-gateway:/app
+      - ./api-gateway:/app/api-gateway
+      - ./proto:/app/proto
       - ./users_serv:/app/users_serv
-    command: ["./wait-for-it.sh", "users_serv:5000", "--", "pytest", "tests/"]
+      - ./posts_serv:/app/posts_serv
+    command: ["./api-gateway/wait-for-it.sh", "users_serv:5000", "--", "pytest", "tests/"]
     depends_on:
       - api_gateway
+      - user_service
+      - post_service
+      - db
     environment:
       - FLASK_ENV=testing
       - TZ=Europe/Moscow
-      - PYTHONPATH=/app
+      - PYTHONPATH=/app:/app/proto:/app/posts_serv:/app/api-gateway
     networks:
       - my_network
 
-  unit_tests:
+  unit_tests_userv:
     build: ./users_serv
     volumes:
       - ./users_serv:/app
@@ -75,6 +101,24 @@ services:
       - FLASK_ENV=testing
       - TZ=Europe/Moscow
       - PYTHONPATH=/app
+    networks:
+      - my_network
+
+  unit_tests_pserv:
+    build:
+      context: .
+      dockerfile: posts_serv/Dockerfile
+    volumes:
+      - ./posts_serv:/app
+      - ./posts_serv/tests:/app/tests
+      - ./proto:/app/proto
+    command: [ "pytest", "tests/" ]
+    depends_on:
+      - db
+    environment:
+      - FLASK_ENV=testing
+      - TZ=Europe/Moscow
+      - PYTHONPATH=/app:/app/proto
     networks:
       - my_network
 
