@@ -158,7 +158,7 @@ def update_profile():
                 is_valid, message = validate_date_of_birth(profile_data['date_of_birth'])
                 if not is_valid:
                     return jsonify({"message": message}), 400
-                user.profile.date_of_birth = datetime.datetime.strptime(profile_data['date_of_birth'], "%Y-%m-%d")
+                user.profile.date_of_birth = datetime.strptime(profile_data['date_of_birth'], "%Y-%m-%d")
 
         db.session.commit()
         return jsonify({"message": "Profile updated successfully"}), 200

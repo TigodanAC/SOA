@@ -20,12 +20,17 @@ app = Flask(__name__)
 app.config['JSON_SORT_KEYS'] = False
 app.config['USER_SERVICE_URL'] = USER_SERVICE_URL
 
+@app.after_request
+def after_request(response):
+    response.headers.add('Access-Control-Allow-Origin', '*')
+    response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
+    response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
+    return response
 
 @app.route('/register', methods=['POST'])
 def register():
     try:
         response = requests.post(f"{USER_SERVICE_URL}/register", json=request.json)
-        print(response.json(), flush=True)
         return jsonify(response.json()), response.status_code
     except Exception as e:
         return jsonify({"message": f"Internal server error: {e}"}), 500
@@ -43,7 +48,6 @@ def login():
 @app.route('/profile', methods=['GET'])
 def get_profile():
     try:
-        print(request.headers, flush=True)
         response = requests.get(f"{USER_SERVICE_URL}/profile", headers=request.headers)
         return jsonify(response.json()), response.status_code
     except Exception as e:
@@ -93,7 +97,7 @@ def create_post(user_id: str):
     try:
         grpc_request = post_pb2.CreatePostRequest(
             title=data.title,
-            description=data.description or "",
+            description=data.description,
             creator_id=user_id,
             is_private=data.is_private,
             tags=data.tags

@@ -272,7 +272,7 @@ paths:
                 summary: "Первый пользователь"
                 value:
                   first_name: "Cristiano"
-                  last_name: "rondaldo"
+                  last_name: "Ronaldo"
                   profile:
                     avatar: "https://example.com/cr7.png"
                     description: "Best footballer over all time"

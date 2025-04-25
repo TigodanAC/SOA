@@ -179,9 +179,12 @@ class PostDB:
         return post_pb2.Post(
             post_id=str(post.post_id),
             title=post.title,
+            description=post.description,
             creator_id=post.creator_id,
             created_at=post.created_at.isoformat(),
-            is_private=post.is_private
+            updated_at=post.updated_at.isoformat() if post.updated_at else "",
+            is_private=post.is_private,
+            tags=post.tags if post.tags else []
         )
 
     def close(self):
