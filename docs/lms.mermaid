@@ -1,0 +1,52 @@
+erDiagram
+  USERS {
+    uuid user_id PK
+    string email
+    string password
+    string first_name
+    string last_name
+    string role
+    string group_id FK
+    datetime createion_time
+  }
+
+  GROUPS {
+    uuid group_id PK
+    uuid course_id PK
+    uuid seminarist_id FK
+  }
+
+  COURSES {
+    uuid course_id PK
+    string name
+    string description
+    uuid lector_id FK
+  }
+
+  BLOCKS {
+    uuid block_id PK
+    uuid course_id FK
+    string name
+  }
+
+  UNITS {
+    uuid block_id PK
+    uuid course_id FK
+    string name
+    string type
+    text content
+  }
+
+  SETS {
+    uuid set_id PK
+    uuid user_id PK
+    datetime createion_time
+  }
+
+  SETS_BLOCKS {
+    uuid set_id PK
+    uuid course_id PK
+    string type PK
+    uuid user_id FK
+    text content
+  }

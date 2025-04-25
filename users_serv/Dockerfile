@@ -1,7 +1,8 @@
 FROM python:3.9-slim
 WORKDIR /app
-COPY requirements.txt .
+COPY users_serv/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-COPY user_service.py models.py .
+COPY . .
+COPY broker/ ./broker/
 EXPOSE 5000
-CMD ["python", "user_service.py"]
+CMD ["python", "users_serv/user_service.py"]

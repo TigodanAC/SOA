@@ -1,17 +1,21 @@
-from flask import Flask, request, jsonify, g, Response
-import requests
-import grpc
 import json
 from collections import OrderedDict
+from datetime import datetime
+
+import grpc
+import requests
+from flask import Flask, request, jsonify, g, Response
+from proto import post_pb2, post_pb2_grpc
+
 from auth import token_required
 from schemas import (
     PostCreate,
     PostUpdate,
     PostResponse,
-    ListPostsQuery,
+    ListQuery,
+    CommentCreation,
     validate_post_id,
 )
-from proto import post_pb2, post_pb2_grpc
 
 USER_SERVICE_URL = "http://user_service:5000"
 POST_SERVICE_URL = "post_service:50051"
@@ -20,12 +24,14 @@ app = Flask(__name__)
 app.config['JSON_SORT_KEYS'] = False
 app.config['USER_SERVICE_URL'] = USER_SERVICE_URL
 
+
 @app.after_request
 def after_request(response):
     response.headers.add('Access-Control-Allow-Origin', '*')
     response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
     response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
     return response
+
 
 @app.route('/register', methods=['POST'])
 def register():
@@ -61,7 +67,6 @@ def update_profile():
         return jsonify(response.json()), response.status_code
     except Exception as e:
         return jsonify({"message": f"Internal server error: {e}"}), 500
-
 
 
 def get_grpc_stub():
@@ -204,7 +209,7 @@ def delete_post(user_id: str, post_id: str):
 @token_required
 def list_posts(user_id: str):
     try:
-        query = ListPostsQuery(
+        query = ListQuery(
             page=request.args.get('page', 1, type=int),
             per_page=request.args.get('per_page', 10, type=int)
         )
@@ -236,6 +241,136 @@ def list_posts(user_id: str):
 
         return Response(
             json.dumps({"posts": posts}, ensure_ascii=False, sort_keys=False),
+            mimetype='application/json'
+        ), 200
+
+    except grpc.RpcError as e:
+        return handle_grpc_error(e)
+    except Exception as e:
+        return jsonify({"message": f"Error: {e}"}), 400
+
+
+@app.route('/view/<post_id>', methods=['POST'])
+@token_required
+def view_post(user_id: str, post_id: str):
+    try:
+        post_id = validate_post_id(post_id)
+        stub = get_grpc_stub()
+        grpc_request = post_pb2.ViewPostRequest(
+            post_id=str(post_id),
+            user_id=user_id
+        )
+        response = stub.ViewPost(grpc_request)
+
+        response_data = OrderedDict([
+            ("success", response.success),
+            ("viewed_at", datetime.utcnow().isoformat())
+        ])
+
+        return Response(
+            json.dumps(response_data, ensure_ascii=False),
+            mimetype='application/json'
+        ), 200
+
+    except grpc.RpcError as e:
+        return handle_grpc_error(e)
+    except Exception as e:
+        return jsonify({"message": f"Error: {e}"}), 400
+
+
+@app.route('/like/<post_id>', methods=['POST'])
+@token_required
+def like_post(user_id: str, post_id: str):
+    try:
+        post_id = validate_post_id(post_id)
+        stub = get_grpc_stub()
+        grpc_request = post_pb2.LikePostRequest(
+            post_id=str(post_id),
+            user_id=user_id
+        )
+        response = stub.LikePost(grpc_request)
+
+        response_data = OrderedDict([
+            ("success", response.success),
+            ("liked_at", datetime.utcnow().isoformat())
+        ])
+
+        return Response(
+            json.dumps(response_data, ensure_ascii=False),
+            mimetype='application/json'
+        ), 200
+
+    except grpc.RpcError as e:
+        return handle_grpc_error(e)
+    except Exception as e:
+        return jsonify({"message": f"Error: {e}"}), 400
+
+
+@app.route('/comment/<post_id>', methods=['POST'])
+@token_required
+def comment_post(user_id: str, post_id: str):
+    try:
+        post_id = validate_post_id(post_id)
+        data = CommentCreation(**request.get_json())
+        stub = get_grpc_stub()
+        grpc_request = post_pb2.CommentPostRequest(
+            post_id=str(post_id),
+            user_id=user_id,
+            comment=data.text
+        )
+        response = stub.CommentPost(grpc_request)
+
+        return jsonify({
+            "comment_id": int(response.comment_id),
+            "created_at": response.created_at
+        }), 201
+
+    except grpc.RpcError as e:
+        return handle_grpc_error(e)
+    except Exception as e:
+        return jsonify({"message": f"Error: {e}"}), 400
+
+
+@app.route('/comment/<post_id>', methods=['GET'])
+@token_required
+def list_comments(user_id: str, post_id: str):
+    post_id = validate_post_id(post_id)
+    try:
+        query = ListQuery(
+            page=request.args.get('page', 1, type=int),
+            per_page=request.args.get('per_page', 10, type=int)
+        )
+    except Exception as e:
+        return jsonify({"message": f"Error: {e}"}), 400
+
+    try:
+        grpc_request = post_pb2.ListCommentsRequest(
+            post_id=str(post_id),
+            user_id=user_id,
+            page=query.page,
+            per_page=query.per_page
+        )
+        stub = get_grpc_stub()
+        response = stub.ListComments(grpc_request)
+
+        comments = [
+            OrderedDict([
+                ("comment_id", int(comment.comment_id)),
+                ("text", comment.text),
+                ("user_id", comment.user_id),
+                ("created_at", comment.created_at)
+            ])
+            for comment in response.comments
+        ]
+        meta = OrderedDict([
+            ("total", response.meta.total),
+            ("page", response.meta.page),
+            ("per_page", response.meta.per_page),
+            ("last_page", response.meta.last_page)
+        ])
+
+        return Response(
+            json.dumps({"comments": comments, 'meta': meta}, ensure_ascii=False, sort_keys=False),
             mimetype='application/json'
         ), 200
 

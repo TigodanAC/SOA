@@ -53,9 +53,12 @@ class PostResponse(PostBase):
         ])
 
 
-class ListPostsQuery(BaseModel):
+class ListQuery(BaseModel):
     page: int = Field(1, gt=0)
     per_page: int = Field(10, gt=0, le=100)
+
+class CommentCreation(BaseModel):
+    text: str = Field(..., min_length=1, max_length=1000)
 
 
 class ListPostsResponse(BaseModel):
