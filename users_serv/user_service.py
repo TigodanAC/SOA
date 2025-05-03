@@ -8,6 +8,7 @@ from models import db, User, UserProfile
 from validity.validators import *
 from sqlalchemy import create_engine
 from sqlalchemy.exc import OperationalError
+from broker.kafka_producer import kafka_producer
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://user:password@db/user_db'
@@ -78,6 +79,12 @@ def register():
 
     db.session.add(new_user)
     db.session.commit()
+
+    kafka_producer.send_user_registration_event(
+        user_id=user_id,
+        email=new_user.email,
+        registration_date=datetime.utcnow().isoformat()
+    )
 
     return jsonify({"message": "User registered successfully"}), 201
 
@@ -158,7 +165,7 @@ def update_profile():
                 is_valid, message = validate_date_of_birth(profile_data['date_of_birth'])
                 if not is_valid:
                     return jsonify({"message": message}), 400
-                user.profile.date_of_birth = datetime.datetime.strptime(profile_data['date_of_birth'], "%Y-%m-%d")
+                user.profile.date_of_birth = datetime.strptime(profile_data['date_of_birth'], "%Y-%m-%d")
 
         db.session.commit()
         return jsonify({"message": "Profile updated successfully"}), 200

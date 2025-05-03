@@ -7,3 +7,4 @@ psycopg2-binary==2.9.3
 python-dotenv==0.19.2
 pytest
 pytest-dependency
+confluent-kafka==2.2.0

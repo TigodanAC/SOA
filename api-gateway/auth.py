@@ -6,7 +6,6 @@ import requests
 def token_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
-        print(request.headers, flush=True)
         token = request.headers.get('Authorization')
         if not token:
             return jsonify({'error': 'Token is missing '}), 401
