@@ -5,7 +5,7 @@ from datetime import datetime
 import grpc
 import requests
 from flask import Flask, request, jsonify, g, Response
-from proto import post_pb2, post_pb2_grpc
+from proto import post_pb2, post_pb2_grpc, statistic_pb2, statistic_pb2_grpc
 
 from auth import token_required
 from schemas import (
@@ -19,6 +19,7 @@ from schemas import (
 
 USER_SERVICE_URL = "http://user_service:5000"
 POST_SERVICE_URL = "post_service:50051"
+STAT_SERVICE_URL = "statistic_service:50052"
 
 app = Flask(__name__)
 app.config['JSON_SORT_KEYS'] = False
@@ -69,11 +70,17 @@ def update_profile():
         return jsonify({"message": f"Internal server error: {e}"}), 500
 
 
-def get_grpc_stub():
-    if "grpc_stub" not in g:
+def get_post_stub():
+    if "post_stub" not in g:
         channel = grpc.insecure_channel(f"{POST_SERVICE_URL}")
-        g.grpc_stub = post_pb2_grpc.PostServiceStub(channel)
-    return g.grpc_stub
+        g.post_stub = post_pb2_grpc.PostServiceStub(channel)
+    return g.post_stub
+
+def get_stat_stub():
+    if "stat_stub" not in g:
+        channel = grpc.insecure_channel(f"{STAT_SERVICE_URL}")
+        g.stat_stub = statistic_pb2_grpc.StatisticServiceStub(channel)
+    return g.stat_stub
 
 
 def handle_grpc_error(error: grpc.RpcError):
@@ -107,7 +114,7 @@ def create_post(user_id: str):
             is_private=data.is_private,
             tags=data.tags
         )
-        stub = get_grpc_stub()
+        stub = get_post_stub()
         response = stub.CreatePost(grpc_request)
         return jsonify({
             "post_id": response.post_id,
@@ -126,7 +133,7 @@ def get_post(user_id: str, post_id: str):
             post_id=str(post_id),
             user_id=user_id
         )
-        stub = get_grpc_stub()
+        stub = get_post_stub()
         response = stub.GetPost(grpc_request)
 
         if not response.HasField('post'):
@@ -176,7 +183,7 @@ def update_post(user_id: str, post_id: str):
             **update_fields
         )
 
-        stub = get_grpc_stub()
+        stub = get_post_stub()
         response = stub.UpdatePost(grpc_request)
         return jsonify({"updated_at": response.updated_at}), 200
 
@@ -195,7 +202,7 @@ def delete_post(user_id: str, post_id: str):
             post_id=str(post_id),
             user_id=user_id
         )
-        stub = get_grpc_stub()
+        stub = get_post_stub()
         _ = stub.DeletePost(grpc_request)
         return jsonify({"message": "Post deleted successfully."}), 200
 
@@ -222,7 +229,7 @@ def list_posts(user_id: str):
             page=query.page,
             per_page=query.per_page
         )
-        stub = get_grpc_stub()
+        stub = get_post_stub()
         response = stub.ListPosts(grpc_request)
 
         posts = [
@@ -255,7 +262,7 @@ def list_posts(user_id: str):
 def view_post(user_id: str, post_id: str):
     try:
         post_id = validate_post_id(post_id)
-        stub = get_grpc_stub()
+        stub = get_post_stub()
         grpc_request = post_pb2.ViewPostRequest(
             post_id=str(post_id),
             user_id=user_id
@@ -283,7 +290,7 @@ def view_post(user_id: str, post_id: str):
 def like_post(user_id: str, post_id: str):
     try:
         post_id = validate_post_id(post_id)
-        stub = get_grpc_stub()
+        stub = get_post_stub()
         grpc_request = post_pb2.LikePostRequest(
             post_id=str(post_id),
             user_id=user_id
@@ -312,7 +319,7 @@ def comment_post(user_id: str, post_id: str):
     try:
         post_id = validate_post_id(post_id)
         data = CommentCreation(**request.get_json())
-        stub = get_grpc_stub()
+        stub = get_post_stub()
         grpc_request = post_pb2.CommentPostRequest(
             post_id=str(post_id),
             user_id=user_id,
@@ -350,7 +357,7 @@ def list_comments(user_id: str, post_id: str):
             page=query.page,
             per_page=query.per_page
         )
-        stub = get_grpc_stub()
+        stub = get_post_stub()
         response = stub.ListComments(grpc_request)
 
         comments = [
@@ -378,6 +385,144 @@ def list_comments(user_id: str, post_id: str):
         return handle_grpc_error(e)
     except Exception as e:
         return jsonify({"message": f"Error: {e}"}), 400
+
+def get_post_creator_id(post_id: str, user_id: str) -> str:
+    stub = get_post_stub()
+    grpc_request = post_pb2.GetPostRequest(
+        post_id=post_id,
+        user_id=user_id
+    )
+    response = stub.GetPost(grpc_request)
+    if not response.HasField('post'):
+        raise grpc.RpcError(grpc.StatusCode.NOT_FOUND, "Post not found")
+    return response.post.creator_id
+
+
+@app.route('/posts/stats/<post_id>', methods=['GET'])
+@token_required
+def get_post_stats(user_id: str, post_id: str):
+    creator_id = get_post_creator_id(post_id, user_id)
+    stub = get_stat_stub()
+    response = stub.GetPostStats(
+        statistic_pb2.PostStatsRequest(post_id=post_id, user_id=creator_id)
+    )
+
+    return Response(
+        json.dumps(OrderedDict([
+            ("views_count", response.views_count),
+            ("likes_count", response.likes_count),
+            ("comments_count", response.comments_count)
+        ]), ensure_ascii=False),
+        200,
+        mimetype='application/json'
+    )
+
+
+@app.route('/posts/dynamic/<post_id>', methods=['GET'])
+@token_required
+def get_post_dynamic(user_id: str, post_id: str):
+    creator_id = get_post_creator_id(post_id, user_id)
+    if creator_id != user_id:
+        return jsonify({"message": "Only post creator can view post dynamics"}), 403
+
+    metric = request.args.get('metric', 'views')
+    if metric not in ['views', 'likes', 'comments']:
+        return jsonify({"message": "Invalid metric"}), 400
+
+    metric_map = {
+        'views': statistic_pb2.PostDynamicRequest.VIEWS,
+        'likes': statistic_pb2.PostDynamicRequest.LIKES,
+        'comments': statistic_pb2.PostDynamicRequest.COMMENTS
+    }
+
+    stub = get_stat_stub()
+    response = stub.GetPostDynamic(
+        statistic_pb2.PostDynamicRequest(
+            post_id=post_id,
+            metric=metric_map[metric],
+            user_id=creator_id
+        )
+    )
+
+    stats = [
+        OrderedDict([
+            ("date", stat.date),
+            ("count", stat.count)
+        ])
+        for stat in response.stats
+    ]
+
+    return Response(
+        json.dumps(stats, ensure_ascii=False),
+        200,
+        mimetype='application/json'
+    )
+
+
+@app.route('/posts/top', methods=['GET'])
+@token_required
+def get_top_posts(user_id: str):
+    metric = request.args.get('metric', 'views')
+    if metric not in ['views', 'likes', 'comments']:
+        return jsonify({"message": "Invalid metric"}), 400
+
+    metric_map = {
+        'views': statistic_pb2.TopPostsRequest.VIEWS,
+        'likes': statistic_pb2.TopPostsRequest.LIKES,
+        'comments': statistic_pb2.TopPostsRequest.COMMENTS
+    }
+
+    stub = get_stat_stub()
+    response = stub.GetTopPosts(
+        statistic_pb2.TopPostsRequest(metric=metric_map[metric], user_id=user_id)
+    )
+
+    posts = [
+        OrderedDict([
+            ("post_id", post.post_id),
+            ("count", post.count)
+        ])
+        for post in response.posts
+    ]
+
+    return Response(
+        json.dumps(posts, ensure_ascii=False),
+        200,
+        mimetype='application/json'
+    )
+
+
+@app.route('/users/top', methods=['GET'])
+@token_required
+def get_top_users(user_id: str):
+    metric = request.args.get('metric', 'views')
+    if metric not in ['views', 'likes', 'comments']:
+        return jsonify({"message": "Invalid metric"}), 400
+
+    metric_map = {
+        'views': statistic_pb2.TopUsersRequest.VIEWS,
+        'likes': statistic_pb2.TopUsersRequest.LIKES,
+        'comments': statistic_pb2.TopUsersRequest.COMMENTS
+    }
+
+    stub = get_stat_stub()
+    response = stub.GetTopUsers(
+        statistic_pb2.TopUsersRequest(metric=metric_map[metric], user_id=user_id)
+    )
+
+    users = [
+        OrderedDict([
+            ("user_id", user.user_id),
+            ("count", user.count)
+        ])
+        for user in response.users
+    ]
+
+    return Response(
+        json.dumps(users, ensure_ascii=False),
+        200,
+        mimetype='application/json'
+    )
 
 
 if __name__ == '__main__':
