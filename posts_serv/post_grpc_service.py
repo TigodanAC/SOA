@@ -1,7 +1,10 @@
 import grpc
+from broker.kafka_producer import kafka_producer
+
+from post_db import PostDB
 from proto import post_pb2
 from proto import post_pb2_grpc
-from post_db import PostDB
+
 
 class PostServiceServicer(post_pb2_grpc.PostServiceServicer):
     def __init__(self, db: PostDB):
@@ -74,3 +77,49 @@ class PostServiceServicer(post_pb2_grpc.PostServiceServicer):
             context.set_code(grpc.StatusCode.INTERNAL)
             context.set_details("Internal server error")
             return post_pb2.ListPostsResponse()
+
+    def ViewPost(self, request, context):
+        try:
+            kafka_producer.send_post_viewed_event(request.user_id, request.post_id)
+            return post_pb2.ViewPostResponse(success=True)
+        except Exception:
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details("Internal server error")
+            return post_pb2.ViewPostResponse()
+
+    def LikePost(self, request, context):
+        try:
+            kafka_producer.send_post_liked_event(request.user_id, request.post_id)
+            return post_pb2.LikePostResponse(success=True)
+        except Exception:
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details("Internal server error")
+            return post_pb2.LikePostResponse()
+
+    def CommentPost(self, request, context):
+        try:
+            result = self.db.create_comment(request)
+            kafka_producer.send_post_commented_event(
+                user_id=request.user_id,
+                post_id=request.post_id,
+                comment_id=result.comment_id,
+                text=request.comment[:100]
+            )
+            return result
+        except Exception:
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details("Internal server error")
+            return post_pb2.CommentPostResponse()
+
+    def ListComments(self, request, context):
+        try:
+            return self.db.list_comments(
+                request.post_id,
+                request.user_id,
+                request.page,
+                request.per_page
+            )
+        except Exception:
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details("Internal server error")
+            return post_pb2.ListCommentsResponse()

@@ -175,3 +175,81 @@ def test_list_posts_success(servicer, dummy_context):
     assert response.page == 1
     assert len(response.posts) == 5
     assert dummy_context.code is None
+
+def test_list_comments_success(servicer, dummy_context):
+    service, mock_db = servicer
+
+    mock_response = post_pb2.ListCommentsResponse(
+        comments=[
+            post_pb2.Comment(
+                comment_id="1",
+                text="Test comment",
+                user_id="user123",
+                created_at="2023-01-01T00:00:00"
+            )
+        ],
+        meta=post_pb2.Meta(
+            total=1,
+            page=1,
+            per_page=10,
+            last_page=1
+        )
+    )
+    mock_db.list_comments.return_value = mock_response
+
+    request = post_pb2.ListCommentsRequest(
+        post_id="123",
+        user_id="user123",
+        page=1,
+        per_page=10
+    )
+    response = service.ListComments(request, dummy_context)
+
+    assert len(response.comments) == 1
+    assert response.comments[0].text == "Test comment"
+    assert response.meta.total == 1
+    assert dummy_context.code is None
+
+
+def test_list_comments_pagination_error(servicer, dummy_context):
+    service, mock_db = servicer
+    mock_db.list_comments.side_effect = Exception("Internal server error")
+
+    request = post_pb2.ListCommentsRequest(
+        post_id="123",
+        user_id="user123",
+        page=999,
+        per_page=10
+    )
+    response = service.ListComments(request, dummy_context)
+
+    assert isinstance(response, post_pb2.ListCommentsResponse)
+    assert "Internal server error" in dummy_context.details
+
+
+def test_list_comments_access_denied(servicer, dummy_context):
+    service, mock_db = servicer
+    mock_db.list_comments.side_effect = Exception("Internal server error")
+
+    request = post_pb2.ListCommentsRequest(
+        post_id="123",
+        user_id="user123"
+    )
+    response = service.ListComments(request, dummy_context)
+
+    assert isinstance(response, post_pb2.ListCommentsResponse)
+    assert "Internal server error" in dummy_context.details
+
+
+def test_list_comments_pagination_params(servicer, dummy_context):
+    service, mock_db = servicer
+
+    request = post_pb2.ListCommentsRequest(
+        post_id="123",
+        user_id="user123",
+        page=2,
+        per_page=5
+    )
+
+    service.ListComments(request, dummy_context)
+    mock_db.list_comments.assert_called_with("123", "user123", 2, 5)

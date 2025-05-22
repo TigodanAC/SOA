@@ -104,6 +104,40 @@ components:
             to_:
               type: integer
 
+    Comment:
+      type: object
+      properties:
+        comment_id:
+          type: string
+        text:
+          type: string
+        user_id:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        post_id:
+          type: string
+
+    CommentList:
+      type: object
+      properties:
+        comments:
+          type: array
+          items:
+            $ref: '#/components/schemas/Comment'
+        meta:
+          type: object
+          properties:
+            total:
+              type: integer
+            per_page:
+              type: integer
+            current_page:
+              type: integer
+            last_page:
+              type: integer
+
     ErrorResponse:
       type: object
       required:
@@ -272,7 +306,7 @@ paths:
                 summary: "Первый пользователь"
                 value:
                   first_name: "Cristiano"
-                  last_name: "rondaldo"
+                  last_name: "Ronaldo"
                   profile:
                     avatar: "https://example.com/cr7.png"
                     description: "Best footballer over all time"
@@ -512,6 +546,159 @@ paths:
                 properties:
                   message:
                     type: string
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /comment/{post_id}:
+    post:
+      summary: Add comment to post
+      tags: [ Comments ]
+      security:
+        - ApiKeyAuth: [ ]
+      parameters:
+        - name: post_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                text:
+                  type: string
+            examples:
+              valid_comment:
+                summary: "Пример комментария"
+                value:
+                  text: "Отличный пост, спасибо!"
+      responses:
+        '201':
+          description: Comment added successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  comment_id:
+                    type: integer
+                  created_at:
+                    type: string
+                    format: date-time
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    get:
+      summary: Get post comments
+      tags: [ Comments ]
+      security:
+        - ApiKeyAuth: [ ]
+      parameters:
+        - name: post_id
+          in: path
+          required: true
+          schema:
+            type: string
+          example: '2'
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+          example: 1
+        - name: per_page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 10
+          example: 2
+      responses:
+        '200':
+          description: List of comments
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommentList'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /view/{post_id}:
+    post:
+      summary: View a post
+      tags: [ Posts ]
+      security:
+        - ApiKeyAuth: [ ]
+      parameters:
+        - name: post_id
+          in: path
+          required: true
+          schema:
+            type: string
+          example: '2'
+      responses:
+        '200':
+          description: View counted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  viewed_at:
+                    type: string
+                    format: date-time
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /like/{post_id}:
+    post:
+      summary: Like a post
+      tags: [ Posts ]
+      security:
+        - ApiKeyAuth: [ ]
+      parameters:
+        - name: post_id
+          in: path
+          required: true
+          schema:
+            type: string
+          example: '2'
+      responses:
+        '200':
+          description: Post liked
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  liked_at:
+                    type: string
+                    format: date-time
         '400':
           description: Bad request
           content:

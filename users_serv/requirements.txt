@@ -6,3 +6,4 @@ PyJWT==2.8.0
 pytest
 pytest-dependency
 email_validator
+confluent-kafka==2.2.0

@@ -23,17 +23,17 @@ services:
       - my_network
 
   user_service:
-    build: ./users_serv
+    build:
+      context: .
+      dockerfile: users_serv/Dockerfile
     ports:
       - "5000:5000"
-    volumes:
-      - ./users_serv:/app
     depends_on:
       - db
     environment:
       - FLASK_ENV=development
       - TZ=Europe/Moscow
-      - PYTHONPATH=/app
+      - PYTHONPATH=/app:/app/broker
     networks:
       - my_network
 
@@ -48,7 +48,7 @@ services:
     environment:
       - FLASK_ENV=development
       - TZ=Europe/Moscow
-      - PYTHONPATH=/app:/app/proto
+      - PYTHONPATH=/app:/app/proto:/app/broker
     networks:
       - my_network
 
@@ -82,25 +82,31 @@ services:
       - user_service
       - post_service
       - db
+      - kafka
     environment:
       - FLASK_ENV=testing
       - TZ=Europe/Moscow
-      - PYTHONPATH=/app:/app/proto:/app/posts_serv:/app/api-gateway
+      - PYTHONPATH=/app:/app/proto:/app/posts_serv:/app/api-gateway:/app/broker
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
     networks:
       - my_network
 
   unit_tests_userv:
-    build: ./users_serv
+    build:
+      context: .
+      dockerfile: users_serv/Dockerfile
     volumes:
       - ./users_serv:/app
       - ./users_serv/tests:/app/tests
+      - ./broker:/app/broker
     command: [ "pytest", "tests/" ]
     depends_on:
       - db
+      - kafka
     environment:
       - FLASK_ENV=testing
       - TZ=Europe/Moscow
-      - PYTHONPATH=/app
+      - PYTHONPATH=/app:/app/broker
     networks:
       - my_network
 
@@ -112,13 +118,56 @@ services:
       - ./posts_serv:/app
       - ./posts_serv/tests:/app/tests
       - ./proto:/app/proto
+      - ./broker:/app/broker
     command: [ "pytest", "tests/" ]
     depends_on:
       - db
+      - kafka
     environment:
       - FLASK_ENV=testing
       - TZ=Europe/Moscow
-      - PYTHONPATH=/app:/app/proto
+      - PYTHONPATH=/app:/app/proto:/app/broker
+    networks:
+      - my_network
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.3.0
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+    networks:
+      - my_network
+
+  kafka:
+    image: confluentinc/cp-kafka:7.3.0
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+    healthcheck:
+      test: [ "CMD-SHELL", "kafka-topics --bootstrap-server kafka:9092 --list" ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - my_network
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    ports:
+      - "8081:8080"
+    environment:
+      DYNAMIC_CONFIG_ENABLED: true
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+    depends_on:
+      - kafka
     networks:
       - my_network
 
