@@ -283,6 +283,128 @@ def test_delete_post_api(client):
     assert get_response.status_code == 404
 
 
+@pytest.mark.dependency(depends=["test_delete_post_api"])
+def test_create_test_data(client):
+    global TOKEN, POST_CREATED_ID, USER_ID
+
+    register_response = client.post('/register', json={
+        "login": "stats_user",
+        "email": "stats@test.com",
+        "password": "Test@1234",
+    })
+    assert register_response.status_code == 201
+
+    login_response = client.post('/login', json={
+        "login": "stats_user",
+        "password": "Test@1234"
+    })
+    assert login_response.status_code == 200
+    TOKEN = login_response.json["token"]
+
+    profile_response = client.get('/profile', headers={"Authorization": TOKEN})
+    assert profile_response.status_code == 200
+    USER_ID = profile_response.json["login"]
+
+    post_response = client.post(
+        '/posts',
+        headers={"Authorization": TOKEN},
+        json={
+            "title": "Stats Test Post",
+            "description": "Post for statistics testing",
+            "is_private": False,
+            "tags": ["stats"]
+        }
+    )
+    assert post_response.status_code == 201
+    POST_CREATED_ID = str(post_response.json["post_id"])
+
+    for _ in range(3):
+        client.post(f'/view/{POST_CREATED_ID}', headers={"Authorization": TOKEN})
+        client.post(f'/like/{POST_CREATED_ID}', headers={"Authorization": TOKEN})
+        client.post(
+            f'/comment/{POST_CREATED_ID}',
+            headers={"Authorization": TOKEN},
+            json={"text": "Test comment for stats"}
+        )
+
+
+@pytest.mark.dependency(depends=["test_create_test_data"])
+def test_get_post_stats(client):
+    response = client.get(
+        f'/posts/stats/{POST_CREATED_ID}',
+        headers={"Authorization": TOKEN}
+    )
+
+    assert response.status_code == 200
+    data = response.json
+
+    assert "views_count" in data and isinstance(data["views_count"], int)
+    assert "likes_count" in data and isinstance(data["likes_count"], int)
+    assert "comments_count" in data and isinstance(data["comments_count"], int)
+
+    assert data["views_count"] >= 3
+    assert data["likes_count"] >= 3
+    assert data["comments_count"] >= 3
+
+
+@pytest.mark.dependency(depends=["test_create_test_data"])
+def test_get_post_dynamic(client):
+    for metric in ['views', 'likes', 'comments']:
+        response = client.get(
+            f'/posts/dynamic/{POST_CREATED_ID}?metric={metric}',
+            headers={"Authorization": TOKEN}
+        )
+
+        assert response.status_code == 200
+        data = response.json
+
+        assert isinstance(data, list)
+        if len(data) > 0:
+            item = data[0]
+            assert "date" in item and isinstance(item["date"], str)
+            assert "count" in item and isinstance(item["count"], int)
+
+
+@pytest.mark.dependency(depends=["test_create_test_data"])
+def test_get_top_posts(client):
+    for metric in ['views', 'likes', 'comments']:
+        response = client.get(
+            f'/posts/top?metric={metric}',
+            headers={"Authorization": TOKEN}
+        )
+
+        assert response.status_code == 200
+        data = response.json
+
+        assert isinstance(data, list)
+        assert len(data) <= 10  # Топ-10
+
+        if len(data) > 0:
+            item = data[0]
+            assert "post_id" in item and isinstance(item["post_id"], str)
+            assert "count" in item and isinstance(item["count"], int)
+
+
+@pytest.mark.dependency(depends=["test_create_test_data"])
+def test_get_top_users(client):
+    for metric in ['views', 'likes', 'comments']:
+        response = client.get(
+            f'/users/top?metric={metric}',
+            headers={"Authorization": TOKEN}
+        )
+
+        assert response.status_code == 200
+        data = response.json
+
+        assert isinstance(data, list)
+        assert len(data) <= 10
+
+        if len(data) > 0:
+            item = data[0]
+            assert "user_id" in item and isinstance(item["user_id"], str)
+            assert "count" in item and isinstance(item["count"], int)
+
+
 @pytest.fixture(scope="session", autouse=True)
 def cleanup_after_tests():
     yield

@@ -110,8 +110,11 @@ services:
       - api_gateway
       - user_service
       - post_service
+      - statistic_service
       - db
       - kafka
+      - kafka-init
+      - clickhouse
     environment:
       - FLASK_ENV=testing
       - TZ=Europe/Moscow
@@ -197,11 +200,21 @@ services:
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_LOG4J_ROOT_LOGLEVEL: "WARN"
+      KAFKA_LOG4J_LOGGERS: "kafka.controller=ERROR,kafka.producer.async.DefaultEventHandler=ERROR,state.change.logger=ERROR"
+      KAFKA_LOG_HEAP_OPTS: "-Dlog4j.configuration=file:/etc/kafka/log4j.properties"
+    volumes:
+      - ./kafka/log4j.properties:/etc/kafka/log4j.properties
     healthcheck:
       test: [ "CMD-SHELL", "kafka-topics --bootstrap-server kafka:9092 --list" ]
-      interval: 5s
+      interval: 30s
       timeout: 5s
       retries: 10
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "1m"
+        max-file: "2"
     networks:
       - my_network
 
