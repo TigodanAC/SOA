@@ -705,3 +705,171 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+
+
+  /posts/stats/{post_id}:
+    get:
+      summary: Get post statistics (views, likes, comments)
+      tags: [ Statistics ]
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: post_id
+          in: path
+          required: true
+          schema:
+            type: string
+          example: '123'
+      responses:
+        '200':
+          description: Post statistics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  views_count:
+                    type: integer
+                    example: 100
+                  likes_count:
+                    type: integer
+                    example: 50
+                  comments_count:
+                    type: integer
+                    example: 30
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Post not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /posts/dynamic/{post_id}:
+    get:
+      summary: Get post dynamics (views/likes/comments by day)
+      tags: [ Statistics ]
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: post_id
+          in: path
+          required: true
+          schema:
+            type: string
+          example: '123'
+        - name: metric
+          in: query
+          description: Metric type (views, likes or comments)
+          schema:
+            type: string
+            enum: [views, likes, comments]
+            default: views
+      responses:
+        '200':
+          description: Post dynamics data
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    date:
+                      type: string
+                      format: date
+                      example: "2023-01-01"
+                    count:
+                      type: integer
+                      example: 10
+        '400':
+          description: Invalid metric parameter
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden (only post creator can view dynamics)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /posts/top:
+    get:
+      summary: Get top 10 posts by metric
+      tags: [ Statistics ]
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: metric
+          in: query
+          description: Metric type (views, likes or comments)
+          schema:
+            type: string
+            enum: [views, likes, comments]
+            default: views
+      responses:
+        '200':
+          description: List of top posts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    post_id:
+                      type: string
+                      example: "123"
+                    count:
+                      type: integer
+                      example: 100
+        '400':
+          description: Invalid metric parameter
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /users/top:
+    get:
+      summary: Get top 10 users by metric
+      tags: [ Statistics ]
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: metric
+          in: query
+          description: Metric type (views, likes or comments)
+          schema:
+            type: string
+            enum: [views, likes, comments]
+            default: views
+      responses:
+        '200':
+          description: List of top users
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    user_id:
+                      type: string
+                      example: "user1"
+                    count:
+                      type: integer
+                      example: 200
+        '400':
+          description: Invalid metric parameter
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'

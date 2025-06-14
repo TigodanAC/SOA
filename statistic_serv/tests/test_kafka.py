@@ -1,0 +1,201 @@
+import pytest
+import json
+from confluent_kafka import Consumer, KafkaException
+import time
+import requests
+from sqlalchemy import create_engine, select
+from clickhouse_sqlalchemy import make_session
+from ..clickhouse_models import Event, EventType
+
+
+@pytest.fixture(scope="module")
+def clickhouse_session():
+    engine = create_engine('clickhouse://default:password@clickhouse:8123/default')
+    session = make_session(engine)
+    yield session
+    session.close()
+
+
+@pytest.fixture(scope="module")
+def kafka_consumer():
+    conf = {
+        'bootstrap.servers': 'kafka:9092',
+        'group.id': 'test-group',
+        'auto.offset.reset': 'earliest',
+        'session.timeout.ms': 6000,
+        'enable.auto.commit': False
+    }
+    consumer = Consumer(conf)
+    yield consumer
+    consumer.close()
+
+
+@pytest.fixture(scope="module")
+def test_user():
+    return {
+        "login": "kafka_test_user",
+        "password": "KafkaTest123!",
+        "email": "kafka.test@example.com",
+        "first_name": "Kafka",
+        "last_name": "Test"
+    }
+
+
+def test_user_registration_event(kafka_consumer, test_user):
+    kafka_consumer.subscribe(['user_registrations'])
+    response = requests.post(
+        'http://api_gateway:8080/register',
+        json=test_user
+    )
+    assert response.status_code == 201
+
+    start_time = time.time()
+    while time.time() - start_time < 10:
+        msg = kafka_consumer.poll(1.0)
+        if msg is None:
+            continue
+        if msg.error():
+            raise KafkaException(msg.error())
+
+        event = json.loads(msg.value())
+        if event.get("email") == test_user["email"]:
+            assert event['event_type'] == 'user_registration'
+            assert 'user_id' in event
+            assert event['email'] == test_user["email"]
+            assert 'registration_date' in event
+            return
+
+    pytest.fail("Event not received in Kafka within timeout")
+
+
+def test_post_view_event(kafka_consumer, test_user, clickhouse_session):
+    login_response = requests.post(
+        'http://api_gateway:8080/login',
+        json={"login": test_user["login"], "password": test_user["password"]}
+    )
+    assert login_response.status_code == 200
+    token = login_response.json()["token"]
+
+    post_response = requests.post(
+        'http://api_gateway:8080/posts',
+        headers={"Authorization": token},
+        json={"title": "Kafka Test Post", "description": "Post for Kafka testing", "is_private": False}
+    )
+    assert post_response.status_code == 201
+    post_id = post_response.json()["post_id"]
+
+    kafka_consumer.subscribe(['post_views'])
+
+    view_response = requests.post(
+        f'http://api_gateway:8080/view/{post_id}',
+        headers={"Authorization": token}
+    )
+    assert view_response.status_code == 200
+
+    start_time = time.time()
+    while time.time() - start_time < 27:
+        msg = kafka_consumer.poll(1.0)
+        if msg is None:
+            continue
+        if msg.error():
+            raise KafkaException(msg.error())
+
+        event = json.loads(msg.value())
+        if event.get("post_id") == str(post_id):
+            assert event['event_type'] == 'post_viewed'
+            time.sleep(1)
+            stmt = select(Event).where(Event.post_id == str(post_id), Event.event_type == EventType.VIEW)
+            result = clickhouse_session.execute(stmt).fetchone()
+            assert result is not None
+            return
+
+    pytest.fail("Kafka event not received within timeout")
+
+
+def test_post_like_event(kafka_consumer, test_user, clickhouse_session):
+    login_response = requests.post(
+        'http://api_gateway:8080/login',
+        json={"login": test_user["login"], "password": test_user["password"]}
+    )
+    assert login_response.status_code == 200
+    token = login_response.json()["token"]
+
+    post_response = requests.post(
+        'http://api_gateway:8080/posts',
+        headers={"Authorization": token},
+        json={"title": "Kafka Like Test", "description": "Post for like testing", "is_private": False}
+    )
+    assert post_response.status_code == 201
+    post_id = post_response.json()["post_id"]
+
+    kafka_consumer.subscribe(['post_likes'])
+
+    like_response = requests.post(
+        f'http://api_gateway:8080/like/{post_id}',
+        headers={"Authorization": token}
+    )
+    assert like_response.status_code == 200
+
+    start_time = time.time()
+    while time.time() - start_time < 10:
+        msg = kafka_consumer.poll(1.0)
+        if msg is None:
+            continue
+        if msg.error():
+            raise KafkaException(msg.error())
+
+        event = json.loads(msg.value())
+        if event.get("post_id") == str(post_id):
+            assert event['event_type'] == 'post_liked'
+            time.sleep(1)
+            stmt = select(Event).where(Event.post_id == str(post_id), Event.event_type == EventType.LIKE)
+            result = clickhouse_session.execute(stmt).fetchone()
+            assert result is not None
+            return
+
+    pytest.fail("Kafka event not received within timeout")
+
+
+def test_post_comment_event(kafka_consumer, test_user, clickhouse_session):
+    login_response = requests.post(
+        'http://api_gateway:8080/login',
+        json={"login": test_user["login"], "password": test_user["password"]}
+    )
+    assert login_response.status_code == 200
+    token = login_response.json()["token"]
+
+    post_response = requests.post(
+        'http://api_gateway:8080/posts',
+        headers={"Authorization": token},
+        json={"title": "Kafka Comment Test", "description": "Post for comment testing", "is_private": False}
+    )
+    assert post_response.status_code == 201
+    post_id = post_response.json()["post_id"]
+
+    kafka_consumer.subscribe(['post_comments'])
+    comment_response = requests.post(
+        f'http://api_gateway:8080/comment/{post_id}',
+        headers={"Authorization": token},
+        json={"text": "Test comment for Kafka"}
+    )
+    assert comment_response.status_code == 201
+    comment_id = comment_response.json()["comment_id"]
+
+    start_time = time.time()
+    while time.time() - start_time < 10:
+        msg = kafka_consumer.poll(1.0)
+        if msg is None:
+            continue
+        if msg.error():
+            raise KafkaException(msg.error())
+
+        event = json.loads(msg.value())
+        if event.get("post_id") == str(post_id) and event.get("comment_id") == str(comment_id):
+            assert event['event_type'] == 'post_commented'
+            time.sleep(1)
+            stmt = select(Event).where(Event.post_id == str(post_id), Event.event_type == EventType.COMMENT)
+            result = clickhouse_session.execute(stmt).fetchone()
+            assert result is not None
+            return
+
+    pytest.fail("Kafka event not received within timeout")

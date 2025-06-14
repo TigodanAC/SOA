@@ -52,6 +52,35 @@ services:
     networks:
       - my_network
 
+  statistic_service:
+    build:
+      context: .
+      dockerfile: statistic_serv/Dockerfile
+    volumes:
+      - ./proto:/app/proto
+      - ./broker:/app/broker
+    command: >
+      sh -c "
+        sleep 10;
+        echo 'Waiting for ClickHouse...';
+        while ! nc -z clickhouse 8123; do sleep 2; done;
+
+        echo 'Creating ClickHouse tables...';
+        python statistic_serv/init_clickhouse.py;
+
+        echo 'Starting main statistics service...';
+        python statistic_serv/main.py"
+    ports:
+      - "50052:50052"
+    networks:
+      - my_network
+    depends_on:
+      - clickhouse
+      - kafka-init
+    environment:
+      - PYTHONPATH=/app:/app/proto:/app/broker
+      - CLICKHOUSE_URL=clickhouse://default:password@clickhouse:8123/default
+
   db:
     image: postgres:13
     environment:
@@ -81,8 +110,11 @@ services:
       - api_gateway
       - user_service
       - post_service
+      - statistic_service
       - db
       - kafka
+      - kafka-init
+      - clickhouse
     environment:
       - FLASK_ENV=testing
       - TZ=Europe/Moscow
@@ -130,6 +162,24 @@ services:
     networks:
       - my_network
 
+  unit_tests_sserv:
+    build:
+      context: .
+      dockerfile: statistic_serv/Dockerfile
+    volumes:
+      - ./proto:/app/proto
+      - ./broker:/app/broker
+    command: [ "pytest", "statistic_serv/tests/" ]
+    depends_on:
+      - db
+      - kafka
+    environment:
+      - FLASK_ENV=testing
+      - TZ=Europe/Moscow
+      - PYTHONPATH=/app:/app/proto:/app/broker
+    networks:
+      - my_network
+
   zookeeper:
     image: confluentinc/cp-zookeeper:7.3.0
     environment:
@@ -150,11 +200,21 @@ services:
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_LOG4J_ROOT_LOGLEVEL: "WARN"
+      KAFKA_LOG4J_LOGGERS: "kafka.controller=ERROR,kafka.producer.async.DefaultEventHandler=ERROR,state.change.logger=ERROR"
+      KAFKA_LOG_HEAP_OPTS: "-Dlog4j.configuration=file:/etc/kafka/log4j.properties"
+    volumes:
+      - ./kafka/log4j.properties:/etc/kafka/log4j.properties
     healthcheck:
       test: [ "CMD-SHELL", "kafka-topics --bootstrap-server kafka:9092 --list" ]
-      interval: 5s
+      interval: 30s
       timeout: 5s
       retries: 10
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "1m"
+        max-file: "2"
     networks:
       - my_network
 
@@ -168,6 +228,35 @@ services:
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
     depends_on:
       - kafka
+    networks:
+      - my_network
+
+  kafka-init:
+    image: confluentinc/cp-kafka:7.3.0
+    depends_on:
+      - kafka
+    command: >
+      bash -c "
+        echo 'Waiting for Kafka to be ready...';
+        while ! kafka-topics --bootstrap-server kafka:9092 --list; do sleep 2; done;
+        echo 'Creating topics...';
+        kafka-topics --bootstrap-server kafka:9092 --create --topic post_views --partitions 1 --replication-factor 1;
+        kafka-topics --bootstrap-server kafka:9092 --create --topic post_likes --partitions 1 --replication-factor 1;
+        kafka-topics --bootstrap-server kafka:9092 --create --topic post_comments --partitions 1 --replication-factor 1;
+        echo 'Topics created successfully';
+      "
+    networks:
+      - my_network
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:latest
+    environment:
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_PASSWORD: password
+      CLICKHOUSE_DB: default
+    ports:
+      - "8123:8123"
+      - "9000:9000"
     networks:
       - my_network
 
